@@ -1,28 +1,51 @@
-var builder = WebApplication.CreateBuilder(args);
+using Amazon.CognitoIdentityProvider;
+using Amazon.SecretsManager;
+using Amazon.SecretsManager.Extensions.Caching;
+using Business.Services;
+using Business.Services.Aws;
 
-// Add services to the container.
-
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+internal class Program
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    private static void Main(string[] args)
+    {
+        var builder = WebApplication.CreateBuilder(args);
+
+        // Services: Basics
+        builder.Services.AddControllers();
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen();
+
+        // Services: AWS
+        var awsOptions = builder.Configuration.GetAWSOptions();
+        builder.Services.AddDefaultAWSOptions(awsOptions);
+        builder.Services.AddTransient<IAmazonCognitoIdentityProvider, AmazonCognitoIdentityProviderClient>();
+        builder.Services.AddSingleton<IAmazonSecretsManager, AmazonSecretsManagerClient>();
+        builder.Services.AddSingleton<ISecretsManagerCache, SecretsManagerCache>();
+
+        // Services: Custom - AWS-Related
+        builder.Services.AddTransient<ICognitoService, CognitoService>();
+        builder.Services.AddScoped<ISecretsManagerService, SecretsManagerService>();
+
+        // Services: Custom - General
+        builder.Services.AddTransient<IUserAuthService, UserAuthService>();
+
+        var app = builder.Build();
+
+        // HTTP Request Pipeline
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseSwagger();
+            app.UseSwaggerUI();
+        }
+        else
+        {
+            app.UseHttpsRedirection();
+        }
+
+        app.UseAuthorization();
+
+        app.MapControllers();
+
+        app.Run();
+    }
 }
-else
-{
-    app.UseHttpsRedirection();
-}
-
-
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
